@@ -6,23 +6,28 @@ from tkinter import StringVar
 from PIL import Image, ImageTk
 import time
 
+# Initialize MediaPipe Hands
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
+
+# Open the camera
 cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
     print("Cannot open camera")
     exit()
 
-finger_tips = [8, 12, 16, 20]
-thumb_tip = 4
+# Define finger tips and thumb tip landmark indices
+finger_tips = [8, 12, 16, 20]  # Index, Middle, Ring, Pinky
+thumb_tip = 5               # Thumb
 
 # Initialize variables to keep track of the gesture and time
 last_finger_count = 0
 gesture_start_time = None
-gesture_duration = 3  # Time in seconds to hold the gesture
+gesture_duration = 1  # Time in seconds to hold the gesture
 
 def perform_action(finger_count, action_var):
+    """Perform action based on the number of fingers detected."""
     if finger_count == 1:
         subprocess.run(['osascript', '-e', 'tell application "Music" to playpause'])
         action_var.set("One finger: Play/Pause")
@@ -41,20 +46,25 @@ def perform_action(finger_count, action_var):
     else:
         action_var.set("No fingers detected")
 
+# Create the GUI
 root = tk.Tk()
 root.title("Hand Gesture Recognition")
 root.geometry("800x600")
 
+# Variable to display actions
 action_var = StringVar()
 action_var.set("No gesture detected yet")
 
+# Label to display the action
 action_label = tk.Label(root, textvariable=action_var, font=("Helvetica", 16))
 action_label.pack(pady=20)
 
+# Canvas to display the camera feed
 canvas = tk.Canvas(root, width=640, height=480)
 canvas.pack()
 
 def update_gui():
+    """Update the GUI with the camera feed and detect gestures."""
     global last_finger_count, gesture_start_time
     
     success, image = cap.read()
@@ -63,8 +73,8 @@ def update_gui():
         root.after(10, update_gui)
         return
     
-    image = cv2.flip(image, 1)
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv2.flip(image, 1)  # Flip the image for a mirror effect
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
     results = hands.process(image_rgb)
 
     if results.multi_hand_landmarks:
@@ -73,10 +83,12 @@ def update_gui():
             
             finger_count = 0
             
+            # Count extended fingers
             for tip_id in finger_tips:
                 if hand_landmarks.landmark[tip_id].y < hand_landmarks.landmark[tip_id - 2].y:
                     finger_count += 1
             
+            # Check if thumb is extended
             if hand_landmarks.landmark[thumb_tip].x < hand_landmarks.landmark[thumb_tip - 2].x:
                 finger_count += 1
 
@@ -94,13 +106,15 @@ def update_gui():
     img = Image.fromarray(image_rgb)
     imgtk = ImageTk.PhotoImage(image=img)
     canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
-    canvas.imgtk = imgtk  
+    canvas.imgtk = imgtk  # Keep a reference to avoid garbage collection
 
     root.after(10, update_gui)
 
+# Start the MediaPipe Hands process
 with mp_hands.Hands(max_num_hands=2, min_detection_confidence=0.7, min_tracking_confidence=0.5) as hands:
     update_gui()
     root.mainloop()
 
+# Release the camera and close OpenCV windows
 cap.release()
 cv2.destroyAllWindows()
